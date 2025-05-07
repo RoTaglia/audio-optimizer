@@ -36,15 +36,18 @@ Ideal para músicos, produtores independentes, podcasters e qualquer criador que
 ```bash
 git clone https://github.com/seu-usuario/nome-do-repositorio.git
 cd nome-do-repositorio
-
+```
 ### 2. Instale as dependências
 
+```bash
 python -m venv venv
 venv\Scripts\activate  # No Windows
 source venv/bin/activate  # No Linux/macOS
 
 pip install -r requirements.txt
+```
 
 ### 3. Execute o programa
-
+```bash
 python audio-opt.py
+```
