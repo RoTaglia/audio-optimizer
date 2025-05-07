@@ -21,10 +21,10 @@ Ideal para músicos, produtores independentes, podcasters e qualquer criador que
 
 ## 📸 Capturas de Tela
 
-![Interface do Programa](screenshots/interface.png)
-![Configurações](screenshots/config.png)
-![Seleção de audios](screenshots/selecao.png)
-![Finalização](screenshots/finalizacao.png)
+![Interface do Programa](screenshots/interface.png)<br>
+![Configurações](screenshots/config.png)<br>
+![Seleção de audios](screenshots/selecao.png)<br>
+![Finalização](screenshots/finalizacao.png)<br>
 ![Relatório](screenshots/relatorio.png)
 
 ---
