@@ -147,7 +147,7 @@ def mostrar_resultado(txt_path, plot_path):
 def abrir_configuracoes():
     janela = Toplevel()
     janela.title("Configurações de Masterização")
-    janela.geometry("266x650")
+    janela.geometry("220x650")
     
     # Criando um canvas e scrollbar para permitir rolagem
     canvas = Canvas(janela)
