@@ -5,22 +5,36 @@ import noisereduce as nr
 import soundfile as sf
 import pyloudnorm as pyln
 import matplotlib.pyplot as plt
-from tkinter import Tk, filedialog, messagebox, Label, Button, Listbox, Scrollbar, Toplevel, Entry, DoubleVar, Checkbutton, IntVar
-from pedalboard import Pedalboard, Compressor, LowShelfFilter, HighShelfFilter, Gain
+from tkinter import Tk, filedialog, messagebox, Label, Button, Listbox, Scrollbar, Toplevel, Entry, DoubleVar, Checkbutton, IntVar, LabelFrame, Frame, Canvas
+from pedalboard import Pedalboard, Compressor, LowShelfFilter, HighShelfFilter, Gain, Chorus, Reverb
 from pedalboard.io import AudioFile
 
 # CONFIGURAÇÕES PADRÃO
 PARAMS = {
-    'threshold_db': -16,
-    'ratio': 1.8,
-    'attack_ms': 10,
-    'release_ms': 200,
-    'low_gain_db': 3,
-    'high_gain_db': 2,
+    # Parâmetros de compressão
+    'threshold_db': -14,
+    'ratio': 2.5,
+    'attack_ms': 20,
+    'release_ms': 250,
+    
+    # Parâmetros de equalização
+    'low_gain_db': 4,
+    'low_cutoff_hz': 120,
+    'high_gain_db': 3,
+    'high_cutoff_hz': 8000,
+    
+    # Parâmetros de efeitos
+    'reverb_amount': 0.15,
+    'reverb_room_size': 0.5,
+    'chorus_amount': 0.1,
+    'chorus_rate_hz': 0.8,
+    'tape_saturation': 0.08,
+    
+    # Parâmetros de masterização
     'gain_db': 1,
-    'TARGET_LUFS': -18,
-    'MAX_TRUE_PEAK': -1.5,
-    'SAMPLE_RATE': 48000,
+    'TARGET_LUFS': -16,
+    'MAX_TRUE_PEAK': -1.0,
+    'SAMPLE_RATE': 48000
 }
 
 SUPPORTED_EXTENSIONS = ('.mp3', '.wav', '.flac')
@@ -32,23 +46,42 @@ def artistic_mastering(input_path, temp_path):
         audio = f.read(f.frames)
         sr = f.samplerate
 
-    reduced_noise = nr.reduce_noise(y=audio, sr=sr, stationary=True, prop_decrease=0.6)
-
     board = Pedalboard([
-        Compressor(threshold_db=PARAMS['threshold_db'], ratio=PARAMS['ratio'],
-                   attack_ms=PARAMS['attack_ms'], release_ms=PARAMS['release_ms']),
-        LowShelfFilter(cutoff_frequency_hz=120, gain_db=PARAMS['low_gain_db'], q=0.7),
-        HighShelfFilter(cutoff_frequency_hz=8000, gain_db=PARAMS['high_gain_db'], q=0.7),
+        Compressor(
+            threshold_db=PARAMS['threshold_db'],
+            ratio=PARAMS['ratio'],
+            attack_ms=PARAMS['attack_ms'],
+            release_ms=PARAMS['release_ms']
+        ),
+        LowShelfFilter(
+            cutoff_frequency_hz=PARAMS['low_cutoff_hz'],
+            gain_db=PARAMS['low_gain_db'],
+            q=0.7
+        ),
+        HighShelfFilter(
+            cutoff_frequency_hz=PARAMS['high_cutoff_hz'],
+            gain_db=PARAMS['high_gain_db'],
+            q=0.7
+        ),
+        Chorus(
+            rate_hz=PARAMS['chorus_rate_hz'],
+            depth=0.25,
+            mix=PARAMS['chorus_amount']
+        ),
+        Reverb(
+            room_size=PARAMS['reverb_room_size'],
+            damping=0.7,
+            wet_level=PARAMS['reverb_amount']
+        ),
         Gain(gain_db=PARAMS['gain_db'])
     ])
 
-    effected = board(reduced_noise, sr)
+    effected = board(audio, sr)
     peak = np.max(np.abs(effected))
-    if peak > 0.99:
-        effected *= (0.999 / peak)
+    if peak > (10 ** (PARAMS['MAX_TRUE_PEAK'] / 20)):
+        effected *= (10 ** (PARAMS['MAX_TRUE_PEAK'] / 20)) / peak
 
-    num_channels = effected.shape[0] if effected.ndim > 1 else 1
-    with AudioFile(temp_path, 'w', sr, num_channels) as f:
+    with AudioFile(temp_path, 'w', sr, effected.shape[0]) as f:
         f.write(effected)
 
 def normalize_lufs_ffmpeg(temp_path, final_path):
@@ -114,46 +147,102 @@ def mostrar_resultado(txt_path, plot_path):
 def abrir_configuracoes():
     janela = Toplevel()
     janela.title("Configurações de Masterização")
+    janela.geometry("266x650")
+    
+    # Criando um canvas e scrollbar para permitir rolagem
+    canvas = Canvas(janela)
+    scrollbar = Scrollbar(janela, orient="vertical", command=canvas.yview)
+    scrollable_frame = Frame(canvas)
+    
+    scrollable_frame.bind(
+        "<Configure>",
+        lambda e: canvas.configure(
+            scrollregion=canvas.bbox("all")
+        )
+    )
+    
+    canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
+
     entradas = {}
+    row = 0
 
-    PARAMS_DEFAULT = {
-        'threshold_db': -16,
-        'ratio': 1.8,
-        'attack_ms': 10,
-        'release_ms': 200,
-        'low_gain_db': 3,
-        'high_gain_db': 2,
-        'gain_db': 1,
-        'TARGET_LUFS': -18,
-        'MAX_TRUE_PEAK': -1.5,
-        'SAMPLE_RATE': 48000,  # Novo parâmetro adicionado
-    }
-
-    # Correção: usar PARAMS_DEFAULT.items() em vez de PARAMS.items()
-    for i, (param, default) in enumerate(PARAMS_DEFAULT.items()):
-        Label(janela, text=param).grid(row=i, column=0, sticky='e')
-        var = DoubleVar(value=default)
-        Entry(janela, textvariable=var, width=10).grid(row=i, column=1)
+    # Função para criar linhas de parâmetros
+    def criar_parametro(parent, param, value, r):
+        Label(parent, text=param.replace('_', ' ').title() + ":").grid(row=r, column=0, sticky='e', padx=5, pady=2)
+        if param == 'SAMPLE_RATE':
+            var = IntVar(value=value)
+        else:
+            var = DoubleVar(value=value)
+        Entry(parent, textvariable=var, width=10).grid(row=r, column=1, sticky='w', padx=5, pady=2)
         entradas[param] = var
+        return r + 1
 
+    # Adicionando seções de parâmetros
+    sections = [
+        ("Compressão", ['threshold_db', 'ratio', 'attack_ms', 'release_ms']),
+        ("Equalização", ['low_gain_db', 'low_cutoff_hz', 'high_gain_db', 'high_cutoff_hz']),
+        ("Efeitos", ['reverb_amount', 'reverb_room_size', 'chorus_amount', 'chorus_rate_hz', 'tape_saturation']),
+        ("Masterização", ['gain_db', 'TARGET_LUFS', 'MAX_TRUE_PEAK', 'SAMPLE_RATE'])
+    ]
+
+    for section, params in sections:
+        frame = LabelFrame(scrollable_frame, text=section, padx=5, pady=5)
+        frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        row += 1
+        
+        inner_row = 0
+        for param in params:
+            inner_row = criar_parametro(frame, param, PARAMS[param], inner_row)
+        row += inner_row
+
+    # Funções de controle
     def resetar():
+        defaults = {
+            'threshold_db': -14,
+            'ratio': 2.5,
+            'attack_ms': 20,
+            'release_ms': 250,
+            'low_gain_db': 4,
+            'low_cutoff_hz': 120,
+            'high_gain_db': 3,
+            'high_cutoff_hz': 8000,
+            'reverb_amount': 0.15,
+            'reverb_room_size': 0.5,
+            'chorus_amount': 0.1,
+            'chorus_rate_hz': 0.8,
+            'tape_saturation': 0.08,
+            'gain_db': 1,
+            'TARGET_LUFS': -16,
+            'MAX_TRUE_PEAK': -1.0,
+            'SAMPLE_RATE': 48000
+        }
         for key, var in entradas.items():
-            var.set(PARAMS_DEFAULT[key])
+            var.set(defaults[key])
 
     def salvar_config():
         for chave, var in entradas.items():
             try:
-                valor = float(var.get())
-                PARAMS[chave] = valor
+                if chave == 'SAMPLE_RATE':
+                    PARAMS[chave] = int(var.get())
+                else:
+                    PARAMS[chave] = float(var.get())
             except ValueError:
                 messagebox.showerror("Erro", f"Valor inválido para {chave}. Use números.")
                 return
-        messagebox.showinfo("Salvo", "Parâmetros atualizados com sucesso.")
+        messagebox.showinfo("Salvo", "Parâmetros atualizados com sucesso!")
         janela.destroy()
 
-    # Atualizar para usar len(PARAMS_DEFAULT) para posicionar os botões corretamente
-    Button(janela, text="Salvar", command=salvar_config).grid(row=len(PARAMS_DEFAULT), column=0, pady=10)
-    Button(janela, text="Resetar", command=resetar).grid(row=len(PARAMS_DEFAULT), column=1)
+    # Frame para botões
+    btn_frame = Frame(scrollable_frame)
+    btn_frame.grid(row=row, column=0, columnspan=2, pady=10)
+    
+    Button(btn_frame, text="Salvar", command=salvar_config).grid(row=0, column=0, padx=5)
+    Button(btn_frame, text="Resetar", command=resetar).grid(row=0, column=1, padx=5)
+    Button(btn_frame, text="Cancelar", command=janela.destroy).grid(row=0, column=2, padx=5)
     
 # VARIÁVEIS DE ESTADO
 checkboxes = []
