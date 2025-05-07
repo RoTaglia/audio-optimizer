@@ -1,0 +1,8 @@
+noisereduce
+pedalboard
+soundfile
+pyloudnorm
+matplotlib
+numpy
+scipy
+scikit-learn
