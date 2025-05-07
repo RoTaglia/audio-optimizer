@@ -20,14 +20,15 @@ PARAMS = {
     'gain_db': 1,
     'TARGET_LUFS': -18,
     'MAX_TRUE_PEAK': -1.5,
+    'SAMPLE_RATE': 48000,
 }
 
 SUPPORTED_EXTENSIONS = ('.mp3', '.wav', '.flac')
 
 # FUNÇÕES PRINCIPAIS
 
-def artistic_mastering(input_path, temp_path, sample_rate=44100):
-    with AudioFile(input_path).resampled_to(sample_rate) as f:
+def artistic_mastering(input_path, temp_path):
+    with AudioFile(input_path).resampled_to(PARAMS['SAMPLE_RATE']) as f:
         audio = f.read(f.frames)
         sr = f.samplerate
 
@@ -55,7 +56,7 @@ def normalize_lufs_ffmpeg(temp_path, final_path):
         "ffmpeg", "-y",
         "-i", temp_path,
         "-af", f"loudnorm=I={PARAMS['TARGET_LUFS']}:TP={PARAMS['MAX_TRUE_PEAK']}:LRA=11:print_format=summary",
-        "-ar", "44100",
+        "-ar", str(PARAMS['SAMPLE_RATE']),  # Use o valor configurado
         "-acodec", "pcm_s24le",
         final_path
     ]
@@ -115,10 +116,6 @@ def abrir_configuracoes():
     janela.title("Configurações de Masterização")
     entradas = {}
 
-    def resetar():
-        for key, var in entradas.items():
-            var.set(PARAMS_DEFAULT[key])
-
     PARAMS_DEFAULT = {
         'threshold_db': -16,
         'ratio': 1.8,
@@ -129,13 +126,19 @@ def abrir_configuracoes():
         'gain_db': 1,
         'TARGET_LUFS': -18,
         'MAX_TRUE_PEAK': -1.5,
+        'SAMPLE_RATE': 48000,  # Novo parâmetro adicionado
     }
 
-    for i, (param, default) in enumerate(PARAMS.items()):
+    # Correção: usar PARAMS_DEFAULT.items() em vez de PARAMS.items()
+    for i, (param, default) in enumerate(PARAMS_DEFAULT.items()):
         Label(janela, text=param).grid(row=i, column=0, sticky='e')
         var = DoubleVar(value=default)
         Entry(janela, textvariable=var, width=10).grid(row=i, column=1)
         entradas[param] = var
+
+    def resetar():
+        for key, var in entradas.items():
+            var.set(PARAMS_DEFAULT[key])
 
     def salvar_config():
         for chave, var in entradas.items():
@@ -148,9 +151,10 @@ def abrir_configuracoes():
         messagebox.showinfo("Salvo", "Parâmetros atualizados com sucesso.")
         janela.destroy()
 
-    Button(janela, text="Salvar", command=salvar_config).grid(row=len(PARAMS), column=0, pady=10)
-    Button(janela, text="Resetar", command=resetar).grid(row=len(PARAMS), column=1)
-
+    # Atualizar para usar len(PARAMS_DEFAULT) para posicionar os botões corretamente
+    Button(janela, text="Salvar", command=salvar_config).grid(row=len(PARAMS_DEFAULT), column=0, pady=10)
+    Button(janela, text="Resetar", command=resetar).grid(row=len(PARAMS_DEFAULT), column=1)
+    
 # VARIÁVEIS DE ESTADO
 checkboxes = []
 arquivos = []
