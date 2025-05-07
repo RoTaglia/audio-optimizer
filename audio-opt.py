@@ -158,23 +158,30 @@ pasta_selecionada = ""
 
 def selecionar_pasta():
     global pasta_selecionada, checkboxes, arquivos
+
     pasta_selecionada = filedialog.askdirectory()
     if not pasta_selecionada:
         return
 
-    arquivos = [f for f in os.listdir(pasta_selecionada)
-                if f.lower().endswith(SUPPORTED_EXTENSIONS)]
-
+    arquivos = obter_arquivos_suportados(pasta_selecionada)
     if not arquivos:
         messagebox.showinfo("Nada encontrado", "Não foram encontrados arquivos suportados.")
         return
 
+    exibir_selecao_arquivos(arquivos)
+
+def obter_arquivos_suportados(pasta):
+    return [f for f in os.listdir(pasta) if f.lower().endswith(SUPPORTED_EXTENSIONS)]
+
+def exibir_selecao_arquivos(arquivos):
+    global checkboxes
     lista_window = Toplevel()
     lista_window.title("Selecionar Arquivos")
     Label(lista_window, text="Marque os arquivos que deseja processar:").pack(pady=5)
 
     frame = lista_window
     checkboxes.clear()
+
     for f in arquivos:
         var = IntVar(value=1)
         chk = Checkbutton(frame, text=f, variable=var)
@@ -182,6 +189,7 @@ def selecionar_pasta():
         checkboxes.append((f, var))
 
     Button(lista_window, text="Começar Masterização", command=processar_selecionados).pack(pady=10)
+
 
 def processar_selecionados():
     selecionados = [f for f, v in checkboxes if v.get() == 1]
