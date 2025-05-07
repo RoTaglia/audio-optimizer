@@ -34,8 +34,8 @@ Ideal para músicos, produtores independentes, podcasters e qualquer criador que
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/nome-do-repositorio.git
-cd nome-do-repositorio
+git clone https://github.com/RoTaglia/audio-optimizer
+cd audio-optimizer
 ```
 ### 2. Instale as dependências
 
